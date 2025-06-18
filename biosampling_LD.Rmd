@@ -1,0 +1,216 @@
+---
+title: "NOAA Biosampling Species Summaries"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    theme:
+      version: 4
+      bg: "#FFFFFF"
+      fg: "#000000"
+      primary: "#005AA8"
+runtime: shiny
+---
+
+---
+title: "NOAA Biosampling Species Summaries"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    theme:
+      version: 4
+      bg: "#FFFFFF"
+      fg: "#000000"
+      primary: "#005AA8"
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+library(gridExtra)
+library(DT)
+library(stringr)
+
+# Load and clean data
+raw <- read.csv("data/all_samples_12_2024_commonname_datefixed.csv", stringsAsFactors = FALSE)
+
+data <- raw %>%
+  filter(!is.na(ScientificName)) %>%
+  mutate(
+    Date = as.Date(Date),
+    Year = year(Date),
+    Month = factor(month.abb[month(Date)], levels = month.abb),
+    CN = CommonName,
+    CombinedName = str_c(ScientificName, CommonName, sep = " - ")
+  ) %>%
+  filter(!(ScientificName == "Calotomus carolinus" & Length.cm. > 80),
+         !(ScientificName == "Acanthurus lineatus" & Length.cm. > 28)) %>%
+  select(ScientificName, CN, Region, Month, Year,
+         Sex, Length.cm., Weight.g., GonWeight, CombinedName, Date)
+
+regions <- sort(unique(data$Region))
+```
+
+
+Sidebar {.sidebar}
+``` {r}
+selectInput("Region", "Choose Region:", choices = regions, selected = regions[1])
+uiOutput("species_ui")
+checkboxGroupInput("Years", "Filter Years:", choices = character(0), selected = character(0))
+```
+
+
+Column {data-height=150}
+Summary
+``` {r}
+output$text_summary <- renderUI({
+  df <- filtered_data()
+  if (nrow(df) == 0 || all(is.na(df$Length.cm.))) return("No data available for the selected filters.")
+
+  lens <- df$Length.cm.
+  text <- paste0(
+    "Samples: ", nrow(df),
+    " | Fork length (cm): min = ", round(min(lens, na.rm=TRUE), 1),
+    ", median = ", round(median(lens, na.rm=TRUE), 1),
+    ", max = ", round(max(lens, na.rm=TRUE), 1)
+  )
+
+  if (!all(is.na(df$Date))) {
+    last_date <- format(max(df$Date, na.rm = TRUE), "%B %Y")
+    text <- paste0(text, ". Updated ", last_date, ".")
+  }
+
+  text
+})
+
+uiOutput("text_summary")
+```
+
+
+Column {data-height=550}
+Four-Panel Plot
+``` {r}
+output$four_panel_plot <- renderPlot({
+  df <- filtered_data()
+  if (nrow(df) == 0) {
+    plot.new()
+    text(0.5, 0.5, "No data for selected filters", cex = 1.5)
+    return()
+  }
+
+  # Panel 1: Size Distribution
+  p1 <- ggplot(df, aes(Length.cm., fill = Sex)) +
+    geom_histogram(binwidth = 2, color = "black") +
+    labs(x = "Fork Length (cm)", y = "Count", title = "Size Distribution") +
+    theme_bw() + guides(fill = "none")
+
+  # Panel 2: Monthly Sample Count
+  mcount <- df %>%
+    count(Month) %>%
+    complete(Month = factor(month.abb, levels = month.abb), fill = list(n = 0))
+  p2 <- ggplot(mcount, aes(Month, n)) +
+    geom_bar(stat = "identity") +
+    labs(y = "Count", title = "Monthly Samples") +
+    theme_bw() +
+    geom_hline(yintercept = 20, color = "red", linetype = "dashed")
+
+  # Panel 3: GSI vs Length
+  df_gsi <- df %>%
+    mutate(GSI = (GonWeight / Weight.g.) * 100) %>%
+    filter(!is.na(GSI) & is.finite(GSI))
+  p3 <- ggplot(df_gsi, aes(Length.cm., GSI, color = Sex)) +
+    geom_point(size = 2) +
+    labs(x = "Fork Length (cm)", y = "GSI", title = "GSI vs Length") +
+    theme_bw() + guides(color = "none")
+
+  # Panel 4: GSI Seasonality (females only)
+  fm <- df_gsi %>% filter(Sex == "F")
+  p4 <- ggplot(fm, aes(Month, GSI)) +
+    geom_boxplot(fill = "red") +
+    labs(y = "GSI", title = "Female GSI by Month") +
+    theme_bw()
+
+  grid.arrange(p1, p2, p3, p4, nrow = 2)
+})
+
+plotOutput("four_panel_plot")
+```
+
+
+Column
+Filtered Data Table
+``` {r}
+output$data_table <- renderDataTable({
+  df <- filtered_data()
+  head(df, 200)
+}, options = list(pageLength = 10, scrollX = TRUE))
+
+DT::dataTableOutput("data_table")
+```
+
+
+``` {r}
+# Reactive filtered data
+filtered_data <- reactive({
+  req(input$Region, input$Species, input$Years)
+  data %>%
+    filter(
+      Region == input$Region,
+      CombinedName == input$Species,
+      Year %in% input$Years
+    )
+})
+
+# Update species based on region
+output$species_ui <- renderUI({
+  req(input$Region)
+  species_choices <- sort(unique(data$CombinedName[data$Region == input$Region]))
+  selectInput("Species", "Choose Species:", choices = species_choices, selected = species_choices[1])
+})
+
+# Update years based on current data
+observe({
+  req(input$Region)
+
+  df_region <- data %>%
+    filter(Region == input$Region)
+
+  if (!is.null(input$Species)) {
+    df_region <- df_region %>% filter(CombinedName == input$Species)
+  }
+
+  available_years <- sort(unique(df_region$Year[!is.na(df_region$Year)]))
+
+  updateCheckboxGroupInput(
+    session, "Years",
+    choices = available_years,
+    selected = available_years
+  )
+})
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
