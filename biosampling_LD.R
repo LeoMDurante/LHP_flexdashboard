@@ -1,4 +1,15 @@
-#Loading libraries
+# This code runs the biosamnpling shinny app with an online interface
+
+# The code is separated into UI (user interface) and server (back end)
+
+#This separation of concerns helps with:
+
+# Easier debugging
+# Code reusability
+# Collaboration 
+
+
+# -----------  Loading libraries ------
 rm(list=ls())
 library(shiny)
 library(ggplot2)
@@ -14,8 +25,9 @@ library(RColorBrewer)
 library(Polychrome)
 library(tidyr)
 library(gridExtra)
+# ------------------------------------
 
-
+# -----------  Loading data ----------
 #Seeting up a directory
 root_dir <- here(..=0) #Root directory is one folder above where this script is
 
@@ -204,10 +216,13 @@ data <- cbind(data, CombinedName)
 
 # EXCLUDE ROW WHEN YEAR AND MONTH ARE NAS #
 data <- data %>% filter(!is.na(Year) & !is.na(Month))
+# ------------------------------------
 
+#------ UI (User Interface) ----------
+# The ui defines how the app looks
+# It controls user interaction. It determines what the user can see and do
 
-
-# 3. Defining UI
+# Defining UI
 ui <- navbarPage("NOAA Biosampling Species Summaries",
                  
                  # ---- TAB 1: Species Summary ----
@@ -347,8 +362,14 @@ hr(),  # Horizontal line separator
 )
       
 
-  
-  # 4. Define Server
+# ----- Server ---------------------
+# Back-end logic of your app. It is a function that takes inputs from the UI, processes them, 
+# and returns outputs.
+
+# It handles reactivity (automatic updates when inputs change).
+# It does calculations, filtering, and rendering. It keeps UI and data in sync.
+
+  # Define Server
   server <- function(input, output, session) {
     
     # Update SPECIES dropdown
@@ -559,13 +580,15 @@ hr(),  # Horizontal line separator
     })
     
 }
-    
-    
-  # 5. Run the application
+# -------------------------------------- #    
+
+# ------ Run the application -----------------
+# This function launches the app by combining the UI and server: 
+
   shinyApp(ui = ui, server = server)
   
-      
+# --------------------------------------------    
       
 
-
+# The end
 
