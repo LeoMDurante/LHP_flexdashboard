@@ -523,6 +523,10 @@ hr(),  # Horizontal line separator
                CombinedName == input$selected_species,
                Year %in% input$selected_years)
       
+      filtered_data_all_years <- data %>%
+        filter(Region == input$selected_region,
+               CombinedName == input$selected_species)
+      
       # Summary grouped by Year
       summary_by_year <- filtered_data %>%
         group_by(Year) %>%
@@ -539,7 +543,7 @@ hr(),  # Horizontal line separator
         mutate(Year = as.factor(Year))
       
       # Summary for ALL years combined
-      all_years_summary <- filtered_data %>%
+      all_years_summary <- filtered_data_all_years %>%
         summarise(
           Year = "All Years",
           Total_Samples = n(),
