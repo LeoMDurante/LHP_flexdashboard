@@ -1,0 +1,10 @@
+name: lhp_flexdashboard
+title:
+username: eva.schemmel
+account: eva.schemmel
+server: connect.fisheries.noaa.gov
+hostUrl: https://connect.fisheries.noaa.gov/__api__
+appId: 484
+bundleId:
+url: https://connect.fisheries.noaa.gov/biosampling/
+version: 1
